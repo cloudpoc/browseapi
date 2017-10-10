@@ -1,0 +1,80 @@
+buildscript {
+    ext {
+        springBootVersion = '1.2.2.RELEASE'
+    }
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
+        classpath 'se.transmode.gradle:gradle-docker:1.2'
+    }
+}
+
+apply plugin: 'java'
+apply plugin: 'eclipse'
+apply plugin: 'idea'
+apply plugin: 'spring-boot'
+apply plugin: 'docker'
+
+jar {
+    baseName = 'productCompositeService'
+    version = '0.0.1-SNAPSHOT'
+}
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+group = 'cloudpoc'
+mainClassName = 'com.composite.product.OrchestrationServiceApp'
+repositories {
+    mavenLocal()
+    mavenCentral()
+    maven {
+        url 'http://maven.springframework.org/release'
+    }
+}
+
+
+dependencies {
+    compile("org.springframework.boot:spring-boot-starter-web") {
+        exclude module: 'spring-boot-starter-tomcat'
+    }
+    compile("org.springframework.boot:spring-boot-starter-undertow")
+    compile("org.springframework.boot:spring-boot-starter-actuator")
+    compile("org.springframework.cloud:spring-cloud-starter-eureka:1.0.0.RELEASE")
+    compile("org.springframework.cloud:spring-cloud-starter-hystrix:1.0.0.RELEASE")
+
+	compile("org.springframework.cloud:spring-cloud-starter-bus-amqp:1.0.0.RELEASE")
+    compile("org.springframework.cloud:spring-cloud-netflix-hystrix-amqp:1.0.0.RELEASE")
+        
+	compile 'net.sf.json-lib:json-lib:2.4:jdk15'
+	compile 'commons-beanutils:commons-beanutils'
+	
+    testCompile("org.springframework.boot:spring-boot-starter-test")
+}
+
+distDocker {
+    exposePort 8080
+    setEnvironment 'JAVA_OPTS', '-Dspring.profiles.active=docker'
+    push = project.hasProperty('push')
+}
+docker {
+    maintainer = 'Bibin KT <bibin.kt@gmail.com>'
+    baseImage = 'java:8'
+}
+task buildDocker(type: Docker) {
+    baseImage = 'java:8'
+    push = project.hasProperty('push')
+    tag = 'bibin408/browseapi'
+    addFile {
+        from jar
+        rename {'app.jar'}
+    }
+    setEnvironment 'JAVA_OPTS', '-Dspring.profiles.active=docker'
+    entryPoint(['java', '-Djava.security.egd=file:/dev/./urandom', '-jar', '/app.jar'])
+    exposePort(8080)
+}
+buildDocker.dependsOn(build)
+task wrapper(type: Wrapper) {
+    gradleVersion = '2.3'
+}
