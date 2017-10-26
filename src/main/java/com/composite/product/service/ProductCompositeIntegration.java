@@ -4,6 +4,9 @@ import com.composite.product.model.ProductDetail;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
+import com.netflix.hystrix.HystrixCommandGroupKey;
+import com.netflix.hystrix.HystrixCommandKey;
+import com.netflix.hystrix.HystrixObservableCommand;
 import com.netflix.hystrix.contrib.javanica.annotation.HystrixCommand;
 import com.netflix.hystrix.contrib.javanica.annotation.HystrixProperty;
 import com.netflix.ribbon.proxy.annotation.Hystrix;
@@ -21,7 +24,10 @@ import org.springframework.web.client.RestTemplate;
 import java.io.IOException;
 import java.net.URI;
 import java.util.List;
+import java.util.function.Supplier;
+
 import net.sf.json.JSONObject;
+import rx.Observable;
 
 
 @Component
@@ -39,8 +45,7 @@ public class ProductCompositeIntegration {
 	  value="false")}
 	  */
    
-    @HystrixCommand(fallbackMethod = "getProductFallBack") 
-    public JSONObject getProduct(int productId) {
+    public Observable<JSONObject> getProduct(int productId) {
 		JSONObject obj = null;
 
     	try {
@@ -56,33 +61,17 @@ public class ProductCompositeIntegration {
     	} catch (Exception e) {
             LOG.error("getProduct error", e);
         }
-        return obj;
-        
-    }
-    
-    public JSONObject getProductFallBack(int productId) {
-		JSONObject obj = null;
-
-    	try {
-
-        LOG.info("Get Produt from fall back.");
-        //Thread.sleep(5000);
-        ProductDetail pp =  new ProductDetail(productId, "Wrong Set", "This is fall back response buddy :-) ");
-
-        obj = JSONObject.fromObject(pp);
-        LOG.info("GetProduct body: {}",obj);
-
-        
-        } catch (Exception e) {
-            LOG.error("getProduct error", e);
-        }
-        return obj;
-
+        HystrixObservableCommand.Setter setter = HystrixObservableCommand.Setter.withGroupKey(HystrixCommandGroupKey.Factory.asKey("CloudPoc")).andCommandKey(
+                HystrixCommandKey.Factory.asKey("getProduct"));
+        HystrixWrapper<Supplier<JSONObject>, JSONObject> observable =
+                new HystrixWrapper(obj, setter);
+        return observable.toObservable();
     }
 
 
-    public JSONObject getPrice(int productId) {
+    public Observable<JSONObject> getPrice(int productId) {
 		JSONObject obj = null;
+        Supplier<JSONObject> priceInfo;
 
         try {
             LOG.info("Get PRice...");
@@ -95,13 +84,15 @@ public class ProductCompositeIntegration {
     	     obj = restTemplate.getForObject(url, JSONObject.class);
     	     LOG.info("GetPrice body: {}",obj);
 
-
         } catch (Exception e) {
             LOG.error("getPrice error", e);
            // throw e;
         }
-        return obj;
-
+        HystrixObservableCommand.Setter setter = HystrixObservableCommand.Setter.withGroupKey(HystrixCommandGroupKey.Factory.asKey("CloudPoc")).andCommandKey(
+                HystrixCommandKey.Factory.asKey("getPrice"));
+        HystrixWrapper<Supplier<JSONObject>, JSONObject> observable =
+                new HystrixWrapper(obj, setter);
+        return observable.toObservable();
     }
 
 }

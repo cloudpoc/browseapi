@@ -54,23 +54,27 @@ public class ProductCompositeService {
 
     	LOG.info("Starting the product details call....");
 		//RX java implementation............
-		BlockingObservable<ProductAggregated> pa = getProductDetails(productId);
+		ProductAggregated pa = getProductDetails(productId);
 		LOG.info("End of the product details call....");
 
     	
-    	return pa.single();
+    	return pa;
     }
     
-    public BlockingObservable<ProductAggregated> getProductDetails(final int productId) {
-    	Observable<JSONObject> obs1 = Observable.just(integration.getPrice(productId)).observeOn(Schedulers.io()).subscribeOn(Schedulers.io());
-		Observable<JSONObject> obs2 = Observable.just(integration.getProduct(productId)).observeOn(Schedulers.io()).subscribeOn(Schedulers.io());
-        return Observable.zip(
+    public ProductAggregated getProductDetails(final int productId) {
+
+    	Observable<JSONObject> obs1 = integration.getPrice(productId);
+		Observable<JSONObject> obs2 = integration.getProduct(productId);
+		Observable<ProductAggregated> finalPp = Observable.zip(
     			obs1,
     			obs2,
     			(productObj,priceObj) -> {
     				ProductAggregated pp = new ProductAggregated(productObj,priceObj);
     				return pp; 
     			}
-    	).toBlocking();
-    }
+    	).subscribeOn(Schedulers.io());
+
+		return Util.getValueFromObserver(finalPp, "Error retrieving Product details");
+
+	}
 }
